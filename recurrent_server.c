@@ -15,7 +15,7 @@
 #include <sys/wait.h>
 #include <signal.h>
 
-#define PORT "3491"  // the port users will be connecting to
+#define PORT "3492"  // the port users will be connecting to
 
 #define MAXDATASIZE 100 // max number of bytes we can get at once 
 
@@ -55,8 +55,10 @@ int main(void)
 
     int numbytes = 0;
 	char buf[MAXDATASIZE];
-
-    memset(&hints, 0, sizeof hints);
+	
+	memset(&hints, 0, sizeof hints);
+    memset(&buf, 0, sizeof buf);
+    
     hints.ai_family = AF_UNSPEC;
     hints.ai_socktype = SOCK_STREAM;
     hints.ai_flags = AI_PASSIVE; // use my IP
