@@ -1,1 +1,1 @@
-gcc recurrent_server.c -o rs
+gcc -pthread recurrent_server.c -o rs 
