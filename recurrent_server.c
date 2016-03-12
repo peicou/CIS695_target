@@ -61,76 +61,7 @@ void *get_in_addr(struct sockaddr *sa)
 
 void *TCPServer (void *param)
 {
-	return (NULL);
-}
-
-void *ThreeDeeApp (void *param)
-{
-	return (NULL);
-}
-
-queue *queueInit (void)
-{
-	queue *q;
-
-	q = (queue *)malloc (sizeof (queue));
-	if (q == NULL) return (NULL);
-
-	q->empty = 1;
-	q->full = 0;
-	q->head = 0;
-	q->tail = 0;
-	q->mut = (pthread_mutex_t *) malloc (sizeof (pthread_mutex_t));
-	pthread_mutex_init (q->mut, NULL);
-	q->notFull = (pthread_cond_t *) malloc (sizeof (pthread_cond_t));
-	pthread_cond_init (q->notFull, NULL);
-	q->notEmpty = (pthread_cond_t *) malloc (sizeof (pthread_cond_t));
-	pthread_cond_init (q->notEmpty, NULL);
-	
-	return (q);
-}
-
-void queueDelete (queue *q)
-{
-	pthread_mutex_destroy (q->mut);
-	free (q->mut);	
-	pthread_cond_destroy (q->notFull);
-	free (q->notFull);
-	pthread_cond_destroy (q->notEmpty);
-	free (q->notEmpty);
-	free (q);
-}
-
-void queueAdd (queue *q, int in)
-{
-	q->buf[q->tail] = in;
-	q->tail++;
-	if (q->tail == QUEUESIZE)
-		q->tail = 0;
-	if (q->tail == q->head)
-		q->full = 1;
-	q->empty = 0;
-
-	return;
-}
-
-void queueDel (queue *q, int *out)
-{
-	*out = q->buf[q->head];
-
-	q->head++;
-	if (q->head == QUEUESIZE)
-		q->head = 0;
-	if (q->head == q->tail)
-		q->empty = 1;
-	q->full = 0;
-
-	return;
-}
-
-int main(int argc, char *argv[])
-{
-    int sockfd, new_fd;  // listen on sock_fd, new connection on new_fd
+	int sockfd, new_fd;  // listen on sock_fd, new connection on new_fd
     struct addrinfo hints, *servinfo, *p;
     struct sockaddr_storage their_addr; // connector's address information
     socklen_t sin_size;
@@ -138,53 +69,27 @@ int main(int argc, char *argv[])
     int yes=1;
     char s[INET6_ADDRSTRLEN];
     int rv;
-    int port = 0;
+    int port;
     int numbytes = 0;
 	char buf[MAXDATASIZE];
-	
-	if (argc !=2)
-	{
-		printf("Usage: ./rs <port number>\n");
-		return 1;
-	}
-
-	port = atoi(argv[1]);
-	if (port<2000 || port>65535)
-	{
-		printf("port must be an integer between 2000 and 65535\n");
-		printf("invalid value %i", port);
-		return 1;
-	}
-
+	char cPort[256];
 	queue *fifo;
-	pthread_t srv, app;
 
-	fifo = queueInit();
-	if (fifo==NULL)
-	{
-		printf("queueInit failed\n");
-		exit (1);
-	}
-
-	pthread_create(&srv, NULL, TCPServer, fifo);
-	pthread_create(&app, NULL, ThreeDeeApp, fifo);
-	pthread_join(srv, NULL);
-	pthread_join(app, NULL);
-
-	queueDelete(fifo);
-	
-	return 0;
+	fifo = (queue *)param;
 
 	memset(&hints, 0, sizeof hints);
     memset(&buf, 0, sizeof buf);
     
+    queueDel(fifo, &port);
+    sprintf(cPort, "%d", port);
+
     hints.ai_family = AF_UNSPEC;
     hints.ai_socktype = SOCK_STREAM;
     hints.ai_flags = AI_PASSIVE; // use my IP
 
-    if ((rv = getaddrinfo(NULL, argv[1], &hints, &servinfo)) != 0) {
+    if ((rv = getaddrinfo(NULL, cPort, &hints, &servinfo)) != 0) {
         fprintf(stderr, "getaddrinfo: %s\n", gai_strerror(rv));
-        return 1;
+        exit(1);
     }
 
     // loop through all the results and bind to the first we can
@@ -254,5 +159,109 @@ int main(int argc, char *argv[])
 		printf("%s\n",buf);
     }
 
-    return 0;
+	return (NULL);
+}
+
+void *ThreeDeeApp (void *param)
+{
+	return (NULL);
+}
+
+queue *queueInit (void)
+{
+	queue *q;
+
+	q = (queue *)malloc (sizeof (queue));
+	if (q == NULL) return (NULL);
+
+	q->empty = 1;
+	q->full = 0;
+	q->head = 0;
+	q->tail = 0;
+	q->mut = (pthread_mutex_t *) malloc (sizeof (pthread_mutex_t));
+	pthread_mutex_init (q->mut, NULL);
+	q->notFull = (pthread_cond_t *) malloc (sizeof (pthread_cond_t));
+	pthread_cond_init (q->notFull, NULL);
+	q->notEmpty = (pthread_cond_t *) malloc (sizeof (pthread_cond_t));
+	pthread_cond_init (q->notEmpty, NULL);
+	
+	return (q);
+}
+
+void queueDelete (queue *q)
+{
+	pthread_mutex_destroy (q->mut);
+	free (q->mut);	
+	pthread_cond_destroy (q->notFull);
+	free (q->notFull);
+	pthread_cond_destroy (q->notEmpty);
+	free (q->notEmpty);
+	free (q);
+}
+
+void queueAdd (queue *q, int in)
+{
+	q->buf[q->tail] = in;
+	q->tail++;
+	if (q->tail == QUEUESIZE)
+		q->tail = 0;
+	if (q->tail == q->head)
+		q->full = 1;
+	q->empty = 0;
+
+	return;
+}
+
+void queueDel (queue *q, int *out)
+{
+	*out = q->buf[q->head];
+
+	q->head++;
+	if (q->head == QUEUESIZE)
+		q->head = 0;
+	if (q->head == q->tail)
+		q->empty = 1;
+	q->full = 0;
+
+	return;
+}
+
+int main(int argc, char *argv[])
+{
+    int port = 0;
+	
+	if (argc !=2)
+	{
+		printf("Usage: ./rs <port number>\n");
+		return 1;
+	}
+
+	port = atoi(argv[1]);
+
+	if (port<2000 || port>65535)
+	{
+		printf("port must be an integer between 2000 and 65535\n");
+		printf("invalid value %i", port);
+		return 1;
+	}
+
+	queue *fifo;
+	pthread_t srv, app;
+
+	fifo = queueInit();
+	if (fifo==NULL)
+	{
+		printf("queueInit failed\n");
+		exit (1);
+	}
+	queueAdd(fifo, port);
+
+	pthread_create(&srv, NULL, TCPServer, fifo);
+	pthread_create(&app, NULL, ThreeDeeApp, fifo);
+	pthread_join(srv, NULL);
+	pthread_join(app, NULL);
+
+	queueDelete(fifo);
+	
+	return 0;
 }
