@@ -15,8 +15,6 @@
 #include <sys/wait.h>
 #include <signal.h>
 
-#define PORT "3492"  // the port users will be connecting to
-
 #define MAXDATASIZE 100 // max number of bytes we can get at once 
 
 #define BACKLOG 10     // how many pending connections queue will hold
@@ -42,7 +40,7 @@ void *get_in_addr(struct sockaddr *sa)
     return &(((struct sockaddr_in6*)sa)->sin6_addr);
 }
 
-int main(void)
+int main(int argc, char *argv[])
 {
     int sockfd, new_fd;  // listen on sock_fd, new connection on new_fd
     struct addrinfo hints, *servinfo, *p;
@@ -52,10 +50,24 @@ int main(void)
     int yes=1;
     char s[INET6_ADDRSTRLEN];
     int rv;
-
+    int port = 0;
     int numbytes = 0;
 	char buf[MAXDATASIZE];
 	
+	if (argc !=2)
+	{
+		printf("Usage: ./rs <port number>\n");
+		return 1;
+	}
+
+	port = atoi(argv[1]);
+	if (port<2000 || port>65535)
+	{
+		printf("port must be an integer between 2000 and 65535\n");
+		printf("invalid value %i", port);
+		return 1;
+	}
+
 	memset(&hints, 0, sizeof hints);
     memset(&buf, 0, sizeof buf);
     
@@ -63,7 +75,7 @@ int main(void)
     hints.ai_socktype = SOCK_STREAM;
     hints.ai_flags = AI_PASSIVE; // use my IP
 
-    if ((rv = getaddrinfo(NULL, PORT, &hints, &servinfo)) != 0) {
+    if ((rv = getaddrinfo(NULL, argv[1], &hints, &servinfo)) != 0) {
         fprintf(stderr, "getaddrinfo: %s\n", gai_strerror(rv));
         return 1;
     }
@@ -111,7 +123,7 @@ int main(void)
         exit(1);
     }
 
-    printf("server: waiting for connections...\n");
+    printf("server: waiting for connections on port %i...\n", port);
  	sin_size = sizeof their_addr;
     new_fd = accept(sockfd, (struct sockaddr *)&their_addr, &sin_size);
     if (new_fd == -1) {
