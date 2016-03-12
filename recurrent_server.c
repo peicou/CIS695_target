@@ -156,7 +156,17 @@ void *TCPServer (void *param)
     		printf("connection from %s terminated\n", s);
 			exit(0);
 		}
-		printf("%s\n",buf);
+
+		pthread_mutex_lock(fifo->mut);
+		while(fifo->full){
+			printf("server: queue full \n");
+			pthread_cond_wait (fifo->notFull, fifo->mut);
+		}
+		queueAdd(fifo, atoi(buf));
+		printf("server: %s added to queue\n",buf);
+		pthread_mutex_unlock(fifo->mut);
+		pthread_cond_signal(fifo->notEmpty);
+		usleep(500000);
     }
 
 	return (NULL);
@@ -164,6 +174,25 @@ void *TCPServer (void *param)
 
 void *ThreeDeeApp (void *param)
 {
+	queue *fifo;
+	int msg;
+	fifo = (queue *)param;
+	
+	while (1)
+	{
+		pthread_mutex_lock(fifo->mut);
+		while(fifo->empty)
+		{
+			printf("3D app: no messages\n");
+			pthread_cond_wait(fifo->notEmpty, fifo->mut);
+		}
+		queueDel(fifo, &msg);
+		pthread_mutex_unlock(fifo->mut);
+		pthread_cond_signal(fifo->notFull);
+		printf("3D app: received %i\n", msg);
+		usleep(500000);
+	}
+
 	return (NULL);
 }
 
