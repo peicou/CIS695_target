@@ -1,32 +1,50 @@
-OBJDIR=.
+OBJDIR = .
+DESTDIR	= .
+SRCDIR	= .
 TEST?=recurrent_server
-TARG=$(TEST)
+APPNAME=$(TEST)
 
-TCH = /opt/fsl-imx-x11/3.14.52-1.1.0/sysroots/cortexa9hf-vfp-neon-poky-linux-gnueabi
-CROSS_COMPILE = /opt/fsl-imx-x11/3.14.52-1.1.0/sysroots/x86_64-pokysdk-linux/usr/bin/arm-poky-linux-gnueabi/arm-poky-linux-gnueabi-
-CFLAGS += -I$(TCH)/usr/src/kernel/include/uapi -I$(TCH)/usr/src/kernel/include -L$(TCH)/usr/lib -march=armv7-a -mfloat-abi=hard -mfpu=neon -mtune=cortex-a9 --sysroot=$(TCH)
+TCH = /opt/fsl-imx-fb/3.14.52-1.1.0/sysroots/cortexa9hf-vfp-neon-poky-linux-gnueabi
+CROSS_COMPILE = /opt/fsl-imx-fb/3.14.52-1.1.0/sysroots/x86_64-pokysdk-linux/usr/bin/arm-poky-linux-gnueabi/arm-poky-linux-gnueabi-
+CFLAGS += -DLINUX -DEGL_API_FB -I$(TCH)/usr/include -march=armv7-a -mfloat-abi=hard -mfpu=neon -mtune=cortex-a9 --sysroot=$(TCH)
+#system libraries
+FSL_PLATFORM_LIB = $(TCH)/usr/lib
 
-all: $(TARG)
+#other needed vars
+ARCH = arm
+CD = cd
+DEL_FILE = rm -f
+MKDIR = mkdir -p
+RMDIR = rmdir
+CC = $(CROSS_COMPILE)g++
+AR = $(CROSS_COMPILE)ar
+LD = $(CROSS_COMPILE)g++
+CP = cp
+MAKE = make
 
-CC = $(CROSS_COMPILE)gcc
-#LIBS += -lEGL -lGLESv2  -lX11 -lm
-LIBS += -pthread
-
+LFLAGS = -L$(FSL_PLATFORM_LIB) --sysroot=$(TCH)
+LFLAGS += -pthread -lEGL -lGLESv2  -lassimp -lIL -lm -lpng
 SRCS = $(TEST).c
-OBJS = $(patsubst %.c,$(OBJDIR)/%.o,$(SRCS))
 
+OBJECTS	= recurrent_server.o obj3d.o gUtil.o
 
-$(TARG):  $(OBJDIR) $(OBJS)
-	$(CC) $(CFLAGS) -o $@ $(OBJS) $(LIBS)
+first: all
 
-$(OBJDIR):
-	mkdir $(OBJDIR)
+all: $(APPNAME)
 
-$(OBJDIR)/%.o: %.c
+.PHONY: all
+
+$(APPNAME): $(OBJECTS) 
+	-@$(MKDIR) $(DESTDIR)
+	$(LD) $(LFLAGS) -o $(APPNAME) $(OBJECTS)
+
+%.o : %.cpp
 	$(CC) $(CFLAGS) -c $< -o $@
 
 clean:
-	@echo Cleaning up...
-	@rm *.o
-	@rm $(TARG)
-	@echo Done.
+	$(DEL_FILE) $(OBJECTS) $(UTILOBJS)
+	$(DEL_FILE) *~ core *.core
+	
+distclean: clean
+	$(DEL_FILE) $(APPNAME)
+	-@$(RMDIR) $(DESTDIR)

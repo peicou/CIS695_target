@@ -15,6 +15,13 @@
 #include <sys/wait.h>
 #include <signal.h>
 #include <pthread.h>
+#include <GLES2/gl2.h>
+#include <EGL/egl.h>
+#include <math.h>
+#include <vector>
+#include <map>
+#include <sys/time.h>
+#include "obj3d.h"
 
 #define MAXDATASIZE 100 // max number of bytes we can get at once 
 
@@ -25,6 +32,34 @@
 void *TCPServer (void *args);
 void *ThreeDeeApp (void *args);
 
+const int width  = 1024; //your display x res
+const int height = 768;  //your display y res
+
+int frames = 0;
+
+//needed for assImp. info stream
+struct aiLogStream stream;
+
+//native EGL calls
+EGLDisplay		eglDisplay;
+EGLSurface		eglSurface;
+
+// Global Variables, shader handle and program handle
+GLuint       g_hPShaderProgram   = 0;
+GLuint       g_hSBShaderProgram   = 0;
+GLuint       g_hTXShaderProgram   = 0;
+
+GLuint       viewMatrixLoc		= 0;
+GLuint       projMatrixLoc      = 0;
+
+GLuint sbVMLoc, sbPMLoc, sbPosLoc, sbTxHandle;
+GLuint sbVBO[2];
+
+float matProj[16] = {0};
+float matModelView[16] = {0};
+float matSkyBox[16] = {0};
+
+Obj3d * assets;
 typedef struct {
 	int buf[QUEUESIZE];
 	long head, tail;
@@ -38,6 +73,100 @@ void queueDelete (queue *q);
 void queueAdd (queue *q, int in);
 void queueDel (queue *q, int *out);
 
+int preRender()
+{
+
+	// load and compiler vertex/fragment shaders.
+	LoadShaders("resources/shaders/vs_phong.vert", "resources/shaders/fs_phong.frag", g_hPShaderProgram);
+	LoadShaders("resources/shaders/vs_skybox.vert", "resources/shaders/fs_skybox.frag", g_hSBShaderProgram);
+	LoadShaders("resources/shaders/vs_texture.vert", "resources/shaders/fs_texture.frag", g_hTXShaderProgram );
+
+	//init assImp stream
+	stream = aiGetPredefinedLogStream(aiDefaultLogStream_STDOUT,NULL);
+	aiAttachLogStream(&stream);
+
+	//write stream to log 
+	stream = aiGetPredefinedLogStream(aiDefaultLogStream_FILE,"assimp_log.txt");
+	aiAttachLogStream(&stream);
+	
+	ilInit(); //if you use textures, do this.
+
+	if (g_hSBShaderProgram  != 0)	
+	{
+		sbPMLoc= glGetUniformLocation(g_hSBShaderProgram, "projMatrix");
+		sbVMLoc= glGetUniformLocation(g_hSBShaderProgram, "viewMatrix");
+		sbPosLoc = glGetAttribLocation(g_hSBShaderProgram, "positionSB");
+		initSkybox(sbVBO, sbPosLoc);
+	} else {
+		printf("skybox shader program not compiled/linked\n");
+		return 1;
+	}
+	if (g_hPShaderProgram  != 0)
+	{
+		projMatrixLoc= glGetUniformLocation(g_hPShaderProgram, "projMatrix");
+		viewMatrixLoc= glGetUniformLocation(g_hPShaderProgram, "viewMatrix");
+	} else {
+		printf("phong shader program not compiled/linked\n");
+		return 1;
+	}
+	if (g_hTXShaderProgram  != 0)
+	{
+		projMatrixLoc= glGetUniformLocation(g_hTXShaderProgram, "projMatrix");
+		viewMatrixLoc= glGetUniformLocation(g_hTXShaderProgram, "viewMatrix");
+	} else {
+		printf("Texture shader program not compiled/linked\n");
+		return 1;
+	}
+
+	// Build a perspective projection matrix. 
+	fslPerspectiveMatrix4x4 ( matProj, 70.f, 1.3333f, 0.1f, 200.f);
+	fslLoadIdentityMatrix4x4 (matModelView);
+	fslTranslateMatrix4x4 (matModelView, 0, -5.0f, -15.0f); //(0, -2, -10)
+	fslLoadIdentityMatrix4x4 (matSkyBox);
+	fslRotateMatrix4x4(matSkyBox, 180, FSL_Z_AXIS);
+
+	return 0;
+
+}
+
+// sets matrices, renders objects
+void Render(Obj3d *assets, float Xrot, float Yrot, float Zrot, float zoomtr)
+{
+	// Clear background.
+	glClearColor(0.2f, 0.2f, 0.2f, 0.0f);
+	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);	
+
+	//rotate skyBox with object so it looks like the camera is rotating
+	fslRotateMatrix4x4 (matSkyBox, -Yrot, FSL_Y_AXIS);
+	renderSkybox(sbTxHandle, g_hSBShaderProgram, sbVMLoc, sbPMLoc,
+			matSkyBox, matProj, sbPosLoc, sbVBO);
+	fslRotateMatrix4x4 (matModelView, Yrot, FSL_Y_AXIS);
+	assets->draw(matModelView, matProj, viewMatrixLoc, projMatrixLoc);
+   
+	glFlush();
+	
+}
+
+void RenderCleanup(Obj3d *assets)
+{
+	
+	// free assImp scene resources
+	aiReleaseImport(assets->getScene());
+
+	// detach assImp log
+	aiDetachAllLogStreams();
+}
+
+
+
+// Cleanup the shaders.
+void DestroyShaders()
+{
+	glDeleteProgram(g_hPShaderProgram );
+	glDeleteProgram(g_hSBShaderProgram );
+	glDeleteProgram(g_hTXShaderProgram );
+	glUseProgram(0);
+}
 
 void sigchld_handler(int s)
 {
@@ -178,20 +307,54 @@ void *ThreeDeeApp (void *param)
 	int msg;
 	fifo = (queue *)param;
 	
-	while (1)
+	int frameCount = 0;
+	unsigned int start = fslGetTickCount();
+	float Xrotation, Yrotation, Zrotation, zoom = 0;
+	assets = new Obj3d(true);
+	
+	EGLinit(eglDisplay, eglSurface);
+
+	if (1==preRender())
 	{
-		pthread_mutex_lock(fifo->mut);
-		while(fifo->empty)
-		{
-			printf("3D app: no messages\n");
-			pthread_cond_wait(fifo->notEmpty, fifo->mut);
-		}
-		queueDel(fifo, &msg);
-		pthread_mutex_unlock(fifo->mut);
-		pthread_cond_signal(fifo->notFull);
-		printf("3D app: received %i\n", msg);
-		usleep(500000);
+		EGLdeinit(eglDisplay);
+		exit(1);
 	}
+
+	assets->start(g_hTXShaderProgram, "resources/models/tumbler/BatMobil.obj", *assets);
+
+    if(!assets->getScene())
+	{
+		printf("scene could not be loaded\n");	
+		exit(1);
+	}
+
+	printf("scene loaded\n");
+	assets->setCubeHandle(CreateStaticCubemap());
+	sbTxHandle = assets->getCubeHandle();
+	
+	for (;;)
+	{
+		if(!fifo->empty)
+		{
+			pthread_mutex_lock(fifo->mut);
+			queueDel(fifo, &msg);
+			pthread_mutex_unlock(fifo->mut);
+			pthread_cond_signal(fifo->notFull);
+			printf("3D app: received %i\n", msg);
+		}
+		Render(assets, Xrotation, 1, Zrotation, zoom);
+		++ frameCount;
+		eglSwapBuffers(eglDisplay, eglSurface);
+	}
+
+	unsigned int end = fslGetTickCount();
+	float fps = frameCount / ((end - start) / 1000.0f);
+	printf("%d frames in %d ticks -> %.3f fps\n", frameCount, end - start, fps);
+	RenderCleanup(assets);
+	
+	// cleanup
+	DestroyShaders();
+	EGLdeinit(eglDisplay);
 
 	return (NULL);
 }
