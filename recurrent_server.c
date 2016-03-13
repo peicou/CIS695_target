@@ -166,7 +166,7 @@ void *TCPServer (void *param)
 		printf("server: %s added to queue\n",buf);
 		pthread_mutex_unlock(fifo->mut);
 		pthread_cond_signal(fifo->notEmpty);
-		usleep(500000);
+		usleep(1000);
     }
 
 	return (NULL);
