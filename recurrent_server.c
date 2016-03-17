@@ -1,33 +1,10 @@
 /*
-** server.c -- a stream socket server demo
+** Author - Francisco Sandoval
+ * Interfacing the UE4 TCPActorComponent with an embedded target
+ * CIS695
 */
 
-#include <stdio.h>
-#include <stdlib.h>
-#include <unistd.h>
-#include <errno.h>
-#include <string.h>
-#include <sys/types.h>
-#include <sys/socket.h>
-#include <netinet/in.h>
-#include <netdb.h>
-#include <arpa/inet.h>
-#include <sys/wait.h>
-#include <signal.h>
-#include <pthread.h>
-#include <GLES2/gl2.h>
-#include <EGL/egl.h>
-#include <math.h>
-#include <vector>
-#include <map>
-#include <sys/time.h>
 #include "obj3d.h"
-
-#define MAXDATASIZE 100 // max number of bytes we can get at once 
-
-#define BACKLOG 5     // how many pending connections queue will hold
-#define QUEUESIZE 10
-#define LOOP 20
 
 void *TCPServer (void *args);
 void *ThreeDeeApp (void *args);
@@ -46,7 +23,6 @@ EGLSurface		eglSurface;
 
 // Global Variables, shader handle and program handle
 GLuint       g_hPShaderProgram   = 0;
-GLuint       g_hSBShaderProgram   = 0;
 GLuint       g_hTXShaderProgram   = 0;
 
 GLuint       viewMatrixLoc		= 0;
@@ -60,25 +36,12 @@ float matModelView[16] = {0};
 float matSkyBox[16] = {0};
 
 Obj3d * assets;
-typedef struct {
-	int buf[QUEUESIZE];
-	long head, tail;
-	int full, empty;
-	pthread_mutex_t *mut;
-	pthread_cond_t *notFull, *notEmpty;
-} queue;
-
-queue *queueInit (void);
-void queueDelete (queue *q);
-void queueAdd (queue *q, int in);
-void queueDel (queue *q, int *out);
 
 int preRender()
 {
 
 	// load and compiler vertex/fragment shaders.
 	LoadShaders("resources/shaders/vs_phong.vert", "resources/shaders/fs_phong.frag", g_hPShaderProgram);
-	LoadShaders("resources/shaders/vs_skybox.vert", "resources/shaders/fs_skybox.frag", g_hSBShaderProgram);
 	LoadShaders("resources/shaders/vs_texture.vert", "resources/shaders/fs_texture.frag", g_hTXShaderProgram );
 
 	//init assImp stream
@@ -91,16 +54,6 @@ int preRender()
 	
 	ilInit(); //if you use textures, do this.
 
-	if (g_hSBShaderProgram  != 0)	
-	{
-		sbPMLoc= glGetUniformLocation(g_hSBShaderProgram, "projMatrix");
-		sbVMLoc= glGetUniformLocation(g_hSBShaderProgram, "viewMatrix");
-		sbPosLoc = glGetAttribLocation(g_hSBShaderProgram, "positionSB");
-		initSkybox(sbVBO, sbPosLoc);
-	} else {
-		printf("skybox shader program not compiled/linked\n");
-		return 1;
-	}
 	if (g_hPShaderProgram  != 0)
 	{
 		projMatrixLoc= glGetUniformLocation(g_hPShaderProgram, "projMatrix");
@@ -136,10 +89,6 @@ void Render(Obj3d *assets, float Xrot, float Yrot, float Zrot, float zoomtr)
 	glClearColor(0.2f, 0.2f, 0.2f, 0.0f);
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);	
 
-	//rotate skyBox with object so it looks like the camera is rotating
-	fslRotateMatrix4x4 (matSkyBox, -Yrot, FSL_Y_AXIS);
-	renderSkybox(sbTxHandle, g_hSBShaderProgram, sbVMLoc, sbPMLoc,
-			matSkyBox, matProj, sbPosLoc, sbVBO);
 	fslRotateMatrix4x4 (matModelView, Yrot, FSL_Y_AXIS);
 	assets->draw(matModelView, matProj, viewMatrixLoc, projMatrixLoc);
    
@@ -163,14 +112,12 @@ void RenderCleanup(Obj3d *assets)
 void DestroyShaders()
 {
 	glDeleteProgram(g_hPShaderProgram );
-	glDeleteProgram(g_hSBShaderProgram );
 	glDeleteProgram(g_hTXShaderProgram );
 	glUseProgram(0);
 }
 
 void sigchld_handler(int s)
 {
-    // waitpid() might overwrite errno, so we save and restore it:
     int saved_errno = errno;
 
     while(waitpid(-1, NULL, WNOHANG) > 0);
@@ -308,7 +255,6 @@ void *ThreeDeeApp (void *param)
 	fifo = (queue *)param;
 	
 	int frameCount = 0;
-	unsigned int start = fslGetTickCount();
 	float Xrotation, Yrotation, Zrotation, zoom = 0;
 	assets = new Obj3d(true);
 	
@@ -329,8 +275,6 @@ void *ThreeDeeApp (void *param)
 	}
 
 	printf("scene loaded\n");
-	assets->setCubeHandle(CreateStaticCubemap());
-	sbTxHandle = assets->getCubeHandle();
 	
 	for (;;)
 	{
@@ -347,9 +291,6 @@ void *ThreeDeeApp (void *param)
 		eglSwapBuffers(eglDisplay, eglSurface);
 	}
 
-	unsigned int end = fslGetTickCount();
-	float fps = frameCount / ((end - start) / 1000.0f);
-	printf("%d frames in %d ticks -> %.3f fps\n", frameCount, end - start, fps);
 	RenderCleanup(assets);
 	
 	// cleanup
@@ -359,64 +300,6 @@ void *ThreeDeeApp (void *param)
 	return (NULL);
 }
 
-queue *queueInit (void)
-{
-	queue *q;
-
-	q = (queue *)malloc (sizeof (queue));
-	if (q == NULL) return (NULL);
-
-	q->empty = 1;
-	q->full = 0;
-	q->head = 0;
-	q->tail = 0;
-	q->mut = (pthread_mutex_t *) malloc (sizeof (pthread_mutex_t));
-	pthread_mutex_init (q->mut, NULL);
-	q->notFull = (pthread_cond_t *) malloc (sizeof (pthread_cond_t));
-	pthread_cond_init (q->notFull, NULL);
-	q->notEmpty = (pthread_cond_t *) malloc (sizeof (pthread_cond_t));
-	pthread_cond_init (q->notEmpty, NULL);
-	
-	return (q);
-}
-
-void queueDelete (queue *q)
-{
-	pthread_mutex_destroy (q->mut);
-	free (q->mut);	
-	pthread_cond_destroy (q->notFull);
-	free (q->notFull);
-	pthread_cond_destroy (q->notEmpty);
-	free (q->notEmpty);
-	free (q);
-}
-
-void queueAdd (queue *q, int in)
-{
-	q->buf[q->tail] = in;
-	q->tail++;
-	if (q->tail == QUEUESIZE)
-		q->tail = 0;
-	if (q->tail == q->head)
-		q->full = 1;
-	q->empty = 0;
-
-	return;
-}
-
-void queueDel (queue *q, int *out)
-{
-	*out = q->buf[q->head];
-
-	q->head++;
-	if (q->head == QUEUESIZE)
-		q->head = 0;
-	if (q->head == q->tail)
-		q->empty = 1;
-	q->full = 0;
-
-	return;
-}
 
 int main(int argc, char *argv[])
 {
