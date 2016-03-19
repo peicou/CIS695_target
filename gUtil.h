@@ -26,15 +26,14 @@
 #define PI_OVER_360		0.00872664f
 
 #define BACKLOG 5     // how many pending connections queue will hold
-#define QUEUESIZE 10
-#define LOOP 20
+#define QUEUESIZE 1000
 
  #define MAXDATASIZE 100 // max number of bytes we can get at once 
 
-typedef enum fslAxis_e
+typedef enum Axis_e
 {
-	FSL_X_AXIS, FSL_Y_AXIS, FSL_Z_AXIS
-} fslAxis;
+	X_AXIS, Y_AXIS, Z_AXIS
+} Axis;
 
 typedef struct vector3d_int
 {
@@ -58,19 +57,14 @@ typedef struct {
 	pthread_cond_t *notFull, *notEmpty;
 } queue;
 
-//--------------------------------------------------------------------------------------
-// Name: fslGetTickCount
-// Desc: Helper function to get current time
-//--------------------------------------------------------------------------------------
-unsigned int fslGetTickCount();
+void MultMatrix4x4( float *matC, float *matA, float *matB);
+void ScaleMatrix4x4 (float *m, float scaleX, float scaleY, float scaleZ);
+void RotateMatrix4x4 (float *m, float angle, Axis axis);
+void TranslateMatrix4x4 (float *m, float transX, float transY, float transZ);
+void PerspectiveMatrix4x4 ( float *m, float fov, float aspect, float zNear, float zFar);
+void LoadIdentityMatrix4x4 (float *m);
+void PrintMatrix4x4(float *m);
 
-void fslMultMatrix4x4( float *matC, float *matA, float *matB);
-void fslScaleMatrix4x4 (float *m, float scaleX, float scaleY, float scaleZ);
-void fslRotateMatrix4x4 (float *m, float angle, fslAxis axis);
-void fslTranslateMatrix4x4 (float *m, float transX, float transY, float transZ);
-void fslPerspectiveMatrix4x4 ( float *m, float fov, float aspect, float zNear, float zFar);
-void fslLoadIdentityMatrix4x4 (float *m);
-void fslPrintMatrix4x4(float *m);
 int CompileShader(const char * FName, GLuint ShaderNum);
 void LoadShaders(const char * vShaderFName, const char * pShaderFName, GLuint & g_hShaderProgram);
 int EGLinit(EGLDisplay &eglDisplay, EGLSurface &eglSurface);
@@ -79,10 +73,14 @@ GLuint CreateStaticCubemap(void);
 void initSkybox(GLuint *sbVBO, GLuint &sbPosLoc);
 void renderSkybox(GLuint cubehandle, GLuint sbShaderProgram, GLuint sbVMLoc, GLuint sbPMLoc, 
 				  float *matModelView, float *matProj, GLuint sbPosLoc, GLuint *sbVBO);
+
 queue *queueInit (void);
 void queueDelete (queue *q);
 void queueAdd (queue *q, int in);
 void queueDel (queue *q, int *out);
+
+void *get_in_addr(struct sockaddr *sa);
+void sigchld_handler(int s);
 
 #endif //_GUTIL_H_
 

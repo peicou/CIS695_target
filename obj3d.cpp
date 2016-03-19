@@ -39,7 +39,7 @@ Obj3d::Obj3d(bool hasTx){
 	// proj, modelview matrices are uniforms
 	modelMatrixLoc= 0;
 
-	fslLoadIdentityMatrix4x4(matRot);
+	LoadIdentityMatrix4x4(matRot);
 
 	//get uniform locations for frag shader material stuff
 	diffuseLoc = 0;

@@ -12,8 +12,6 @@ void *ThreeDeeApp (void *args);
 const int width  = 1024; //your display x res
 const int height = 768;  //your display y res
 
-int frames = 0;
-
 //needed for assImp. info stream
 struct aiLogStream stream;
 
@@ -28,12 +26,8 @@ GLuint       g_hTXShaderProgram   = 0;
 GLuint       viewMatrixLoc		= 0;
 GLuint       projMatrixLoc      = 0;
 
-GLuint sbVMLoc, sbPMLoc, sbPosLoc, sbTxHandle;
-GLuint sbVBO[2];
-
 float matProj[16] = {0};
 float matModelView[16] = {0};
-float matSkyBox[16] = {0};
 
 Obj3d * assets;
 
@@ -72,15 +66,22 @@ int preRender()
 	}
 
 	// Build a perspective projection matrix. 
-	fslPerspectiveMatrix4x4 ( matProj, 70.f, 1.3333f, 0.1f, 200.f);
-	fslLoadIdentityMatrix4x4 (matModelView);
-	fslTranslateMatrix4x4 (matModelView, 0, -5.0f, -15.0f); //(0, -2, -10)
-	fslLoadIdentityMatrix4x4 (matSkyBox);
-	fslRotateMatrix4x4(matSkyBox, 180, FSL_Z_AXIS);
-
+	PerspectiveMatrix4x4 ( matProj, 70.f, 1.3333f, 0.1f, 200.f);
+	LoadIdentityMatrix4x4 (matModelView);
+	TranslateMatrix4x4 (matModelView, 0, 0, -20.0f); //(0, -2, -10)
+	RotateMatrix4x4 (matModelView, -90, X_AXIS);
 	return 0;
 
 }
+
+void RenderCleanup(Obj3d *assets)
+{
+	// free assImp scene resources
+	aiReleaseImport(assets->getScene());
+	// detach assImp log
+	aiDetachAllLogStreams();
+}
+
 
 // sets matrices, renders objects
 void Render(Obj3d *assets, float Xrot, float Yrot, float Zrot, float zoomtr)
@@ -89,24 +90,12 @@ void Render(Obj3d *assets, float Xrot, float Yrot, float Zrot, float zoomtr)
 	glClearColor(0.2f, 0.2f, 0.2f, 0.0f);
 	glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);	
 
-	fslRotateMatrix4x4 (matModelView, Yrot, FSL_Y_AXIS);
+	RotateMatrix4x4 (matModelView, Yrot, Y_AXIS);
 	assets->draw(matModelView, matProj, viewMatrixLoc, projMatrixLoc);
    
 	glFlush();
 	
 }
-
-void RenderCleanup(Obj3d *assets)
-{
-	
-	// free assImp scene resources
-	aiReleaseImport(assets->getScene());
-
-	// detach assImp log
-	aiDetachAllLogStreams();
-}
-
-
 
 // Cleanup the shaders.
 void DestroyShaders()
@@ -114,25 +103,6 @@ void DestroyShaders()
 	glDeleteProgram(g_hPShaderProgram );
 	glDeleteProgram(g_hTXShaderProgram );
 	glUseProgram(0);
-}
-
-void sigchld_handler(int s)
-{
-    int saved_errno = errno;
-
-    while(waitpid(-1, NULL, WNOHANG) > 0);
-
-    errno = saved_errno;
-}
-
-// get sockaddr, IPv4 or IPv6:
-void *get_in_addr(struct sockaddr *sa)
-{
-    if (sa->sa_family == AF_INET) {
-        return &(((struct sockaddr_in*)sa)->sin_addr);
-    }
-
-    return &(((struct sockaddr_in6*)sa)->sin6_addr);
 }
 
 void *TCPServer (void *param)
@@ -235,11 +205,11 @@ void *TCPServer (void *param)
 
 		pthread_mutex_lock(fifo->mut);
 		while(fifo->full){
-			printf("server: queue full \n");
+			//printf("server: queue full \n");
 			pthread_cond_wait (fifo->notFull, fifo->mut);
 		}
 		queueAdd(fifo, atoi(buf));
-		printf("server: %s added to queue\n",buf);
+		printf("server: %i added to queue\n",atoi(buf));
 		pthread_mutex_unlock(fifo->mut);
 		pthread_cond_signal(fifo->notEmpty);
 		usleep(1000);
@@ -251,7 +221,7 @@ void *TCPServer (void *param)
 void *ThreeDeeApp (void *param)
 {
 	queue *fifo;
-	int msg;
+	int msg, buff = 0;
 	fifo = (queue *)param;
 	
 	int frameCount = 0;
@@ -284,9 +254,24 @@ void *ThreeDeeApp (void *param)
 			queueDel(fifo, &msg);
 			pthread_mutex_unlock(fifo->mut);
 			pthread_cond_signal(fifo->notFull);
-			printf("3D app: received %i\n", msg);
+			//printf("3D app: received %i\n", msg);
 		}
-		Render(assets, Xrotation, 1, Zrotation, zoom);
+		if (msg != buff)
+		{
+			Yrotation = msg - buff;
+			if (msg < buff)
+			{
+				buff = buff - msg;
+			} else
+			{
+				buff = msg;
+			}
+			Render(assets, Xrotation, Yrotation, Zrotation, zoom);
+		} else 
+		{
+			Render(assets, Xrotation, 0, Zrotation, zoom);	
+		}
+		
 		++ frameCount;
 		eglSwapBuffers(eglDisplay, eglSurface);
 	}

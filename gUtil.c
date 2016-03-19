@@ -1,32 +1,3 @@
-/*
- *Copyright (c) 2012 Freescale Semiconductor, Inc.
- *All rights reserved.
- *
- *Redistribution and use in source and binary forms, with or without modification,
- *are permitted provided that the following conditions are met:
- *
- * Redistributions of source code must retain the above copyright notice, this 
- *list of conditions and the following disclaimer.
- *
- * Redistributions in binary form must reproduce the above copyright notice, this 
- *list of conditions and the following disclaimer in the documentation and/or other
- *materials provided with the distribution.
- *
- * Neither the name of the Freescale Semiconductor, Inc. nor the names of its 
- *contributors may be used to endorse or promote products derived from this software
- *without specific prior written permission.
- *
- *THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND 
- *ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED 
- *WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. 
- *IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, 
- *INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT 
- *NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
- *PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY,
- *WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) 
- *ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE 
- *POSSIBILITY OF SUCH DAMAGE.
- */
 
 #include <GLES2/gl2.h>
 #include <GLES2/gl2ext.h>
@@ -36,11 +7,7 @@
 #include "gUtil.h"
 #include <IL/il.h>
 
-//--------------------------------------------------------------------------------------
-// Name: fslMulMatrix4x4
-// Desc: 4x4 Matix Muliply
-//--------------------------------------------------------------------------------------
-void fslMultMatrix4x4( float *matC, float *matA, float *matB)
+void MultMatrix4x4( float *matC, float *matA, float *matB)
 {
 	matC[ 0] = matA[ 0] * matB[ 0] + matA[ 1] * matB[ 4] + matA[ 2] * matB[ 8] + matA[ 3] * matB[12];
 	matC[ 1] = matA[ 0] * matB[ 1] + matA[ 1] * matB[ 5] + matA[ 2] * matB[ 9] + matA[ 3] * matB[13];
@@ -61,7 +28,7 @@ void fslMultMatrix4x4( float *matC, float *matA, float *matB)
 }
 
 
-void fslPerspectiveMatrix4x4 ( float *m, float fov, float aspect, float zNear, float zFar)
+void PerspectiveMatrix4x4 ( float *m, float fov, float aspect, float zNear, float zFar)
 {
 	const float h = 1.0f/tan(fov*PI_OVER_360);
 	float neg_depth = zNear-zFar;
@@ -88,39 +55,39 @@ void fslPerspectiveMatrix4x4 ( float *m, float fov, float aspect, float zNear, f
 
 }
 
-void fslRotateMatrix4x4 (float *m, float angle, fslAxis axis)
+void RotateMatrix4x4 (float *m, float angle, Axis axis)
 {
 	float radians = PI_OVER_360*2*angle;
    
  	float rotate[16] = {0};
 	float store[16] = {0};
 
- 	fslLoadIdentityMatrix4x4(rotate);
+ 	LoadIdentityMatrix4x4(rotate);
 
 	switch (axis)
 	{
-		case FSL_X_AXIS:
+		case X_AXIS:
 			rotate[5] = cosf(radians);
 			rotate[6] = -sinf(radians);
 			rotate[9] = sinf(radians);
 			rotate[10] = cosf(radians);
-			fslMultMatrix4x4(store, rotate, m);
+			MultMatrix4x4(store, rotate, m);
          memcpy( m, store, 16*sizeof(float) );
 		break;
-		case FSL_Y_AXIS:
+		case Y_AXIS:
 			rotate[0] = cos(radians);
 			rotate[2] = sin(radians);
 			rotate[8] = -sin(radians);
 			rotate[10] = cos(radians);
-			fslMultMatrix4x4(store, rotate, m);
+			MultMatrix4x4(store, rotate, m);
 			memcpy( m, store, 16*sizeof(float) );
 		break;		
-		case FSL_Z_AXIS:
+		case Z_AXIS:
 			rotate[0] = cos(radians);
 			rotate[1] = -sin(radians);
 			rotate[4] = sin(radians);
 			rotate[5] = cos(radians);
-			fslMultMatrix4x4(store, rotate, m);
+			MultMatrix4x4(store, rotate, m);
          memcpy( m, store, 16*sizeof(float) );
 		break;		
 		default:
@@ -130,31 +97,31 @@ void fslRotateMatrix4x4 (float *m, float angle, fslAxis axis)
 	}
 }
 
-void fslTranslateMatrix4x4 (float *m, float transX, float transY, float transZ)
+void TranslateMatrix4x4 (float *m, float transX, float transY, float transZ)
 {
  	float trans[16] = {0};
- 	fslLoadIdentityMatrix4x4(trans);
+ 	LoadIdentityMatrix4x4(trans);
 
  	trans[12]=transX;
  	trans[13]=transY;
  	trans[14]=transZ;
 
- 	fslMultMatrix4x4(m, trans, m);
+ 	MultMatrix4x4(m, trans, m);
 }
 
-void fslScaleMatrix4x4 (float *m, float scaleX, float scaleY, float scaleZ)
+void ScaleMatrix4x4 (float *m, float scaleX, float scaleY, float scaleZ)
 {
  	float scale[16] = {0};
- 	fslLoadIdentityMatrix4x4(scale);
+ 	LoadIdentityMatrix4x4(scale);
 
 	scale[0]=scaleX;
 	scale[5]=scaleY;
 	scale[10]=scaleZ;
 
- 	fslMultMatrix4x4(m, scale, m);
+ 	MultMatrix4x4(m, scale, m);
 }
 
-void fslLoadIdentityMatrix4x4 (float *m)
+void LoadIdentityMatrix4x4 (float *m)
 {
 	m[0] = 1;
 	m[1] = 0;
@@ -177,7 +144,7 @@ void fslLoadIdentityMatrix4x4 (float *m)
 	m[15] = 1;
 }
 
-void fslPrintMatrix4x4(float *m){
+void PrintMatrix4x4(float *m){
 	
 	printf(" %f %f %f %f \n", m[0], m[1], m[2], m[3]);
 	printf(" %f %f %f %f \n", m[4], m[5], m[6], m[7]);
@@ -539,4 +506,23 @@ void queueDel (queue *q, int *out)
 	q->full = 0;
 
 	return;
+}
+
+void sigchld_handler(int s)
+{
+    int saved_errno = errno;
+
+    while(waitpid(-1, NULL, WNOHANG) > 0);
+
+    errno = saved_errno;
+}
+
+// get sockaddr, IPv4 or IPv6:
+void *get_in_addr(struct sockaddr *sa)
+{
+    if (sa->sa_family == AF_INET) {
+        return &(((struct sockaddr_in*)sa)->sin_addr);
+    }
+
+    return &(((struct sockaddr_in6*)sa)->sin6_addr);
 }
