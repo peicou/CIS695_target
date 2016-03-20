@@ -210,6 +210,7 @@ void *TCPServer (void *param)
 		}
 		queueAdd(fifo, atoi(buf));
 		printf("server: %i added to queue\n",atoi(buf));
+		memset(&buf, 0, sizeof buf);
 		pthread_mutex_unlock(fifo->mut);
 		pthread_cond_signal(fifo->notEmpty);
 		usleep(1000);
@@ -271,7 +272,7 @@ void *ThreeDeeApp (void *param)
 		{
 			Render(assets, Xrotation, 0, Zrotation, zoom);	
 		}
-		
+		Yrotation = 0;
 		++ frameCount;
 		eglSwapBuffers(eglDisplay, eglSurface);
 	}
