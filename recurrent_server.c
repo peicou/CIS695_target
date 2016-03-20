@@ -70,6 +70,7 @@ int preRender()
 	LoadIdentityMatrix4x4 (matModelView);
 	TranslateMatrix4x4 (matModelView, 0, 0, -20.0f); //(0, -2, -10)
 	RotateMatrix4x4 (matModelView, -90, X_AXIS);
+	RotateMatrix4x4 (matModelView, -90, Y_AXIS);
 	return 0;
 
 }
@@ -225,8 +226,7 @@ void *ThreeDeeApp (void *param)
 	int msg, buff = 0;
 	fifo = (queue *)param;
 	
-	int frameCount = 0;
-	float Xrotation, Yrotation, Zrotation, zoom = 0;
+	float Yrotation = 0;
 	assets = new Obj3d(true);
 	
 	EGLinit(eglDisplay, eglSurface);
@@ -260,20 +260,15 @@ void *ThreeDeeApp (void *param)
 		if (msg != buff)
 		{
 			Yrotation = msg - buff;
-			if (msg < buff)
-			{
-				buff = buff - msg;
-			} else
-			{
-				buff = msg;
-			}
-			Render(assets, Xrotation, Yrotation, Zrotation, zoom);
+			buff = msg;
+			Render(assets, 0, Yrotation*3, 0, 0);
 		} else 
 		{
-			Render(assets, Xrotation, 0, Zrotation, zoom);	
+			Render(assets, 0, 0, 0, 0);	
 		}
 		Yrotation = 0;
-		++ frameCount;
+		//msg=0;
+
 		eglSwapBuffers(eglDisplay, eglSurface);
 	}
 

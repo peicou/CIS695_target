@@ -26,7 +26,7 @@
 #define PI_OVER_360		0.00872664f
 
 #define BACKLOG 5     // how many pending connections queue will hold
-#define QUEUESIZE 1000
+#define QUEUESIZE 100
 
  #define MAXDATASIZE 100 // max number of bytes we can get at once 
 
