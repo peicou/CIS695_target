@@ -57,6 +57,8 @@ typedef struct {
 	pthread_cond_t *notFull, *notEmpty;
 } queue;
 
+void *TCPServer (void *param);
+
 void MultMatrix4x4( float *matC, float *matA, float *matB);
 void ScaleMatrix4x4 (float *m, float scaleX, float scaleY, float scaleZ);
 void RotateMatrix4x4 (float *m, float angle, Axis axis);
