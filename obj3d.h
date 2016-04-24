@@ -1,5 +1,5 @@
+/* Author: Francisco Sandoval */
 
-// assimp include files. These three are usually needed.
 #include <assimp/cimport.h>
 #include <assimp/postprocess.h>
 #include <assimp/scene.h>
@@ -15,7 +15,9 @@
 #include <stdio.h>
 #include "gUtil.h"
 
-// Information to render each assimp node
+/*
+ * MyMaterial - structure to keep material information. self explanatory
+ */
 
 struct MyMaterial{
 
@@ -28,19 +30,33 @@ struct MyMaterial{
 	int texCount;
 };
 
+/*
+ * MyMesh - structure to keep mesh information
+ * VBO - vertex buffer object array to store faces, vertices, normals, and texture coordinates.
+ * texIndex - texture index for this mesh
+ * matInfo - previous structure, keeps material info for this mesh
+ * numFaces - number of faces in this mesh
+ */
 struct MyMesh{
 	
-	GLuint VBO[4]; //to store faces, vertices, normals and texcoords
+	GLuint VBO[4];
 	GLuint texIndex;
 	MyMaterial matInfo;
 	int numFaces;
 };
 
+/*
+ * vboNames - enum for the 4 VBOs. Self descriptive
+ */
 enum vboNames { VBO_faces,
 				VBO_vertices,
 				VBO_normals,
 				VBO_texCoords
 				};
+
+/*
+ * Obj3d - class for parsing and loading a 3d mesh using assetImporter (assImp)
+ */
 class Obj3d{
 
 	std::vector<struct MyMesh> myMeshes;
@@ -51,7 +67,7 @@ class Obj3d{
 	GLuint normalLoc;
 	GLuint texCoordLoc;
 
-	bool hasTextures; //the model
+	bool hasTextures;
 	float matRot[16];
 	bool hasNonOpaque;
 	
